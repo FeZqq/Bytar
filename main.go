@@ -41,6 +41,133 @@ const (
 
 var themeColor = red // Default theme: green
 
+func main() {
+	printBanner()
+	scanner := bufio.NewScanner(os.Stdin)
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		for range signalChan {
+			if !showMode {
+				os.Exit(0)
+			}
+		}
+	}()
+
+	for {
+		fmt.Print(getPrompt())
+		if !scanner.Scan() {
+			continue
+		}
+		raw := scanner.Text()
+
+		if raw == "\x1b[A" && len(commandHistory) > 0 {
+			historyIndex--
+			if historyIndex < 0 {
+				historyIndex = 0
+			}
+			fmt.Println(commandHistory[historyIndex])
+			continue
+		}
+
+		input := strings.TrimSpace(raw)
+
+		if input != "" {
+			commandHistory = append(commandHistory, input)
+			historyIndex = len(commandHistory)
+		}
+
+		if input == "exit" {
+			fmt.Println("Bytar is shutting down...")
+			return
+		}
+
+		if input == "" {
+			continue
+		}
+
+		if strings.HasPrefix(input, "mon ") {
+			showMode = true
+			ctx, cancel := context.WithCancel(context.Background())
+
+			go func() {
+				<-signalChan
+				if showMode {
+					fmt.Println("\nStopping traffic monitoring...")
+					cancel()
+					showMode = false
+				}
+			}()
+
+			targetIP := strings.TrimSpace(strings.TrimPrefix(input, "mon "))
+
+			fmt.Println("Press CTRL+C twice to stop monitoring.")
+			fmt.Printf("%sMonitoring traffic to/from IP: %s%s\n", cyan, targetIP, reset)
+			fmt.Printf("%s%s%s\n", cyan, strings.Repeat("-", 80), reset)
+			fmt.Printf("%s%-15s %-10s %-20s %-8s %-20s %-8s %-10s%s\n", white, "Time", "Direction", "Source", "S-Port", "Destination", "D-Port", "Protocol", reset)
+			fmt.Printf("%s%s%s\n", cyan, strings.Repeat("-", 80), reset)
+
+			devices, err := pcap.FindAllDevs()
+			if err != nil {
+				fmt.Println("Error finding devices:", err)
+				continue
+			}
+
+			for _, device := range devices {
+				handle, err := pcap.OpenLive(device.Name, 1600, true, pcap.BlockForever)
+				if err != nil {
+					fmt.Println("Error opening device:", err)
+					continue
+				}
+				go monitorTraffic(ctx, handle, device.Name, targetIP)
+			}
+
+			<-ctx.Done()
+			showMode = false
+			continue
+		}
+
+		if strings.HasPrefix(input, "scan ") {
+			ip := strings.TrimSpace(strings.TrimPrefix(input, "scan "))
+			scanIP(ip)
+			continue
+		}
+
+		if strings.HasPrefix(input, "theme ") {
+			color := strings.TrimSpace(strings.TrimPrefix(input, "theme "))
+			switch color {
+			case "red":
+				themeColor = red
+			case "green":
+				themeColor = green
+			case "blue":
+				themeColor = blue
+			default:
+				fmt.Println("Invalid theme color. Use: red, green, or blue.")
+			}
+			continue
+		}
+
+		switch input {
+		case "clear":
+			clearScreen()
+		case "banner":
+			printBanner()
+		case "help":
+			showHelp()
+		case "connections":
+			showEstablishedConnections()
+		case "history":
+			for i, cmd := range commandHistory {
+				fmt.Printf("[%d] %s\n", i+1, cmd)
+			}
+		default:
+			fmt.Println("command is missing or incorrect")
+		}
+	}
+}
+
 func getPrompt() string {
 	return themeColor + "Bytar # " + reset
 }
@@ -341,129 +468,4 @@ var commandHistory []string
 var historyIndex int = -1
 var showMode = false
 
-func main() {
-	printBanner()
-	scanner := bufio.NewScanner(os.Stdin)
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 
-	go func() {
-		for range signalChan {
-			if !showMode {
-				os.Exit(0)
-			}
-		}
-	}()
-
-	for {
-		fmt.Print(getPrompt())
-		if !scanner.Scan() {
-			continue
-		}
-		raw := scanner.Text()
-
-		if raw == "\x1b[A" && len(commandHistory) > 0 {
-			historyIndex--
-			if historyIndex < 0 {
-				historyIndex = 0
-			}
-			fmt.Println(commandHistory[historyIndex])
-			continue
-		}
-
-		input := strings.TrimSpace(raw)
-
-		if input != "" {
-			commandHistory = append(commandHistory, input)
-			historyIndex = len(commandHistory)
-		}
-
-		if input == "exit" {
-			fmt.Println("Bytar is shutting down...")
-			return
-		}
-
-		if input == "" {
-			continue
-		}
-
-		if strings.HasPrefix(input, "mon ") {
-			showMode = true
-			ctx, cancel := context.WithCancel(context.Background())
-
-			go func() {
-				<-signalChan
-				if showMode {
-					fmt.Println("\nStopping traffic monitoring...")
-					cancel()
-					showMode = false
-				}
-			}()
-
-			targetIP := strings.TrimSpace(strings.TrimPrefix(input, "mon "))
-
-			fmt.Println("Press CTRL+C twice to stop monitoring.")
-			fmt.Printf("%sMonitoring traffic to/from IP: %s%s\n", cyan, targetIP, reset)
-			fmt.Printf("%s%s%s\n", cyan, strings.Repeat("-", 80), reset)
-			fmt.Printf("%s%-15s %-10s %-20s %-8s %-20s %-8s %-10s%s\n", white, "Time", "Direction", "Source", "S-Port", "Destination", "D-Port", "Protocol", reset)
-			fmt.Printf("%s%s%s\n", cyan, strings.Repeat("-", 80), reset)
-
-			devices, err := pcap.FindAllDevs()
-			if err != nil {
-				fmt.Println("Error finding devices:", err)
-				continue
-			}
-
-			for _, device := range devices {
-				handle, err := pcap.OpenLive(device.Name, 1600, true, pcap.BlockForever)
-				if err != nil {
-					fmt.Println("Error opening device:", err)
-					continue
-				}
-				go monitorTraffic(ctx, handle, device.Name, targetIP)
-			}
-
-			<-ctx.Done()
-			showMode = false
-			continue
-		}
-
-		if strings.HasPrefix(input, "scan ") {
-			ip := strings.TrimSpace(strings.TrimPrefix(input, "scan "))
-			scanIP(ip)
-			continue
-		}
-
-		if strings.HasPrefix(input, "theme ") {
-			color := strings.TrimSpace(strings.TrimPrefix(input, "theme "))
-			switch color {
-			case "red":
-				themeColor = red
-			case "green":
-				themeColor = green
-			case "blue":
-				themeColor = blue
-			default:
-				fmt.Println("Invalid theme color. Use: red, green, or blue.")
-			}
-			continue
-		}
-
-		switch input {
-		case "clear":
-			clearScreen()
-		case "banner":
-			printBanner()
-		case "help":
-			showHelp()
-		case "connections":
-			showEstablishedConnections()
-		case "history":
-			for i, cmd := range commandHistory {
-				fmt.Printf("[%d] %s\n", i+1, cmd)
-			}
-		default:
-			fmt.Println("command is missing or incorrect")
-		}
-	}
-}
