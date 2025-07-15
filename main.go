@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -162,6 +163,10 @@ func main() {
 			for i, cmd := range commandHistory {
 				fmt.Printf("[%d] %s\n", i+1, cmd)
 			}
+		case "firewall":
+			firewallStatus()
+		case "wifipass":
+			PrintWifiPasswords()
 		default:
 			fmt.Println("command is missing or incorrect")
 		}
@@ -250,6 +255,13 @@ func extractIP(address string) string {
 	return host
 }
 
+func truncate(s string, max int) string {
+	if len(s) > max {
+		return s[:max-3] + "..."
+	}
+	return s
+}
+
 func showEstablishedConnections() {
 	var cmd *exec.Cmd
 
@@ -267,37 +279,50 @@ func showEstablishedConnections() {
 		return
 	}
 
-	fmt.Println("\nESTABLISHED TCP Connections:\n")
+	// Başlık
+	fmt.Println()
+	fmt.Printf("%s%-8s%s %s%-20s%s %s%-20s%s %s%-10s%s %s%-45s%s %s%-20s%s\n",
+		cyan, "Type", reset,
+		reset, "Local IP", reset,
+		cyan, "Remote IP", reset,
+		red, "Country", reset,
+		blue, "Org", reset,
+		white, "Hostname", reset,
+	)
+	fmt.Println(green, strings.Repeat("-", 155), reset)
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		fmt.Println(line)
 
 		fields := strings.Fields(line)
-		if len(fields) < 3 {
+		if len(fields) < 4 {
 			continue
 		}
 
-		ip := extractIP(fields[2])
-		if ip == "" {
+		localIP := extractIP(fields[1])
+		remoteIP := extractIP(fields[2])
+		if remoteIP == "" {
 			continue
 		}
 
-		info, err := getIPInfo(ip)
+		info, err := getIPInfo(remoteIP)
 		if err != nil {
-			fmt.Println("IP Info error for", ip, ":", err)
-			continue
+			info = &IPInfo{Org: "-", Hostname: "-", Country: "-"}
 		}
 
-		fmt.Printf("%s------------------------%s\n", green, reset)
-		fmt.Printf("%sIP Info     :%s %s\n", green, white, ip)
-		fmt.Printf("%sOrg         :%s %s\n", green, white, info.Org)
-		fmt.Printf("%sHostname    :%s %s\n", green, white, info.Hostname)
-		fmt.Printf("%sCountry     :%s %s\n", green, white, info.Country)
-		fmt.Printf("%s------------------------%s\n", green, reset)
+		fmt.Printf("%s%-8s%s %s%-20s%s %s%-20s%s %s%-10s%s %s%-45s%s %s%-20s%s\n",
+			cyan, fields[0], reset,
+			reset, localIP, reset,
+			cyan, remoteIP, reset,
+			red, info.Country, reset,
+			blue, info.Org, reset,
+			white, info.Hostname, reset,
+		)
 	}
+	fmt.Println(green, strings.Repeat("-", 155), reset)
 }
 
 func showHelp() {
@@ -311,7 +336,79 @@ func showHelp() {
 	fmt.Printf("%sbanner%s       : %sShow the Bytar banner\n", themeColor, reset, white)
 	fmt.Printf("%stheme <color>%s: %sChange output theme (red, green, blue)\n", themeColor, reset, white)
 	fmt.Printf("%shistory%s      : %sShow command history\n", themeColor, reset, white)
+	fmt.Printf("%sfirewall%s     : %sShow Windows Firewall status\n", themeColor, reset, white)
+	fmt.Printf("%swifipass%s         : %sShow saved Wi-Fi passwords\n", themeColor, reset, white)
 	fmt.Printf("%sexit%s         : %sExit the program\n\n", themeColor, reset, white)
+}
+
+func firewallStatus() {
+	var cmd *exec.Cmd
+	cmd = exec.Command("cmd", "/c", "netsh advfirewall show allprofiles")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("Error running netsh:", err)
+		return
+	}
+	fmt.Println(green, string(output), reset)
+}
+
+func PrintWifiPasswords() {
+	// Get all saved Wi-Fi profiles
+	cmdProfiles := exec.Command("powershell", "-Command", "netsh wlan show profiles")
+	var outProfiles bytes.Buffer
+	cmdProfiles.Stdout = &outProfiles
+	err := cmdProfiles.Run()
+	if err != nil {
+		fmt.Println("Failed to retrieve profiles:", err)
+		return
+	}
+
+	lines := strings.Split(outProfiles.String(), "\n")
+	var ssids []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "All User Profile") {
+			parts := strings.Split(line, ":")
+			if len(parts) == 2 {
+				ssid := strings.TrimSpace(parts[1])
+				ssids = append(ssids, ssid)
+			}
+		}
+	}
+
+	// Print table header
+	fmt.Printf("\n%-30s | %-30s\n", "SSID", "Password")
+	fmt.Println(green, strings.Repeat("-", 65), reset)
+
+	// Get and print password for each profile
+	for _, ssid := range ssids {
+		cmdPassword := exec.Command("powershell", "-Command", fmt.Sprintf("netsh wlan show profile name=\"%s\" key=clear", ssid))
+		var outPass bytes.Buffer
+		cmdPassword.Stdout = &outPass
+		err := cmdPassword.Run()
+		if err != nil {
+			fmt.Printf("%-30s | %-30s\n", ssid, "Error retrieving password")
+			continue
+		}
+
+		output := outPass.String()
+		lines := strings.Split(output, "\n")
+		password := "N/A"
+
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "Key Content") {
+				parts := strings.Split(line, ":")
+				if len(parts) == 2 {
+					password = strings.TrimSpace(parts[1])
+					break
+				}
+			}
+		}
+
+		fmt.Printf("%-30s | %-30s\n", ssid, password)
+	}
 }
 
 func showConnections() {
@@ -467,5 +564,3 @@ func monitorTraffic(ctx context.Context, handle *pcap.Handle, localIP, targetIP 
 var commandHistory []string
 var historyIndex int = -1
 var showMode = false
-
-
