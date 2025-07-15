@@ -1,5 +1,5 @@
 # Bytar
-Bytar is a tool that performs basic network analysis
+Bytar is a tool that performs basic security analysis 
 
 ### Run
 ```
