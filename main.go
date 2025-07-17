@@ -40,7 +40,7 @@ const (
 	reset  = "\033[0m"
 )
 
-var themeColor = red // Default theme: green
+var themeColor = red
 
 func main() {
 	printBanner()
@@ -167,6 +167,10 @@ func main() {
 			firewallStatus()
 		case "wifipass":
 			PrintWifiPasswords()
+		case "services":
+			runningProcesses()
+		case "lports":
+			listeningPorts()
 		default:
 			fmt.Println("command is missing or incorrect")
 		}
@@ -196,6 +200,34 @@ type IPInfo struct {
 	Org      string `json:"org"`
 	Country  string `json:"country"`
 	Hostname string `json:"hostname"`
+}
+
+func runningProcesses() {
+	var cmd *exec.Cmd
+
+	cmd = exec.Command("powershell", "/c", "Get-Service | Where-Object { $_.Status -eq \"Running\" }")
+
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("Error running Get-Service:", err)
+		return
+	}
+
+	fmt.Println(green + string(output) + reset)
+}
+
+func listeningPorts() {
+	var cmd *exec.Cmd
+
+	cmd = exec.Command("powershell", "/c", "netstat -an | findstr LISTENING")
+
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("Error running netstat:", err)
+		return
+	}
+
+	fmt.Println(green + string(output) + reset)
 }
 
 func getIPInfo(ip string) (*IPInfo, error) {
@@ -279,7 +311,6 @@ func showEstablishedConnections() {
 		return
 	}
 
-	// Başlık
 	fmt.Println()
 	fmt.Printf("%s%-8s%s %s%-20s%s %s%-20s%s %s%-10s%s %s%-45s%s %s%-20s%s\n",
 		cyan, "Type", reset,
@@ -332,12 +363,14 @@ func showHelp() {
 	fmt.Printf("%sconnections%s  : %sList established TCP connections with IP info\n", themeColor, reset, white)
 	fmt.Printf("%sscan <ip>%s    : %sScan an IP and show geo and network info\n", themeColor, reset, white)
 	fmt.Printf("%smon <ip>%s     : %sMonitor the packets of between your device and <ip> \n", themeColor, reset, white)
-	fmt.Printf("%sclear%s        : %sClear the terminal screen\n", themeColor, reset, white)
-	fmt.Printf("%sbanner%s       : %sShow the Bytar banner\n", themeColor, reset, white)
-	fmt.Printf("%stheme <color>%s: %sChange output theme (red, green, blue)\n", themeColor, reset, white)
 	fmt.Printf("%shistory%s      : %sShow command history\n", themeColor, reset, white)
 	fmt.Printf("%sfirewall%s     : %sShow Windows Firewall status\n", themeColor, reset, white)
-	fmt.Printf("%swifipass%s         : %sShow saved Wi-Fi passwords\n", themeColor, reset, white)
+	fmt.Printf("%swifipass%s     : %sShow saved Wi-Fi passwords\n", themeColor, reset, white)
+	fmt.Printf("%sservices%s     : %sShow running Windows services\n", themeColor, reset, white)
+	fmt.Printf("%slports%s       : %sShow listening ports\n", themeColor, reset, white)
+	fmt.Printf("%sbanner%s       : %sShow the Bytar banner\n", themeColor, reset, white)
+	fmt.Printf("%sclear%s        : %sClear the terminal screen\n", themeColor, reset, white)
+	fmt.Printf("%stheme <color>%s: %sChange output theme (red, green, blue)\n", themeColor, reset, white)
 	fmt.Printf("%sexit%s         : %sExit the program\n\n", themeColor, reset, white)
 }
 
@@ -353,7 +386,7 @@ func firewallStatus() {
 }
 
 func PrintWifiPasswords() {
-	// Get all saved Wi-Fi profiles
+
 	cmdProfiles := exec.Command("powershell", "-Command", "netsh wlan show profiles")
 	var outProfiles bytes.Buffer
 	cmdProfiles.Stdout = &outProfiles
@@ -377,11 +410,9 @@ func PrintWifiPasswords() {
 		}
 	}
 
-	// Print table header
 	fmt.Printf("\n%-30s | %-30s\n", "SSID", "Password")
 	fmt.Println(green, strings.Repeat("-", 65), reset)
 
-	// Get and print password for each profile
 	for _, ssid := range ssids {
 		cmdPassword := exec.Command("powershell", "-Command", fmt.Sprintf("netsh wlan show profile name=\"%s\" key=clear", ssid))
 		var outPass bytes.Buffer
