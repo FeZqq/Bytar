@@ -12,17 +12,48 @@ go build -o bytar.exe main.go
 ```
 
 ### >_ Features
-- Scans all ip addresses that has active connection between your pc and the ip address. ("connections" command)
-- Gets more information about established ip addresses. ("scan <ip>" command)
-- Shows packets on the connection between your network interfaces and specified ip address. ("mon <ip>" command)
+-Network Connections Viewer:
+	Display all established TCP connections with detailed remote IP, port, organization, country, and hostname information.
+
+-IP Scanner:
+	Scan any IP address to retrieve geolocation, organization, and network details.
+
+-Traffic Monitor:
+	Live monitoring of network packets between your device and a target IP, with protocol, direction, and port info.
+
+-Firewall Status:
+	Instantly check the status of Windows Firewall profiles.
+
+-Wi-Fi Password Recovery:
+	List all saved Wi-Fi SSIDs and their passwords on your system.
+
+-Running Services:
+	Show all currently running Windows services.
+
+-Listening Ports:
+	Display all ports your system is currently listening on.
+
+-Command History:
+	View and reuse previous commands easily.
+
+-Customizable Theme:
+	Change the color theme of the CLI output (red, green, blue).
+
+-Clear & Banner Commands:
+	Quickly clear the terminal or display the Bytar banner.
+
+-Help Menu:
+	Built-in help menu listing all available commands.
+
 
 
 ### >_ Usage
 - Help Menu
-![Screenshot_1](https://github.com/user-attachments/assets/ccfa6958-8a0f-4ba5-9d86-5ab7232ee56c)
+<img width="636" height="560" alt="bytar2" src="https://github.com/user-attachments/assets/5f52d759-949f-47a7-bea3-c904c9a31360" />
+
 
 - Show established connections (Note: If someone has obtained a reverse shell from you, it will appear in active connections. So, if you notice an IP address that does not belong to your organization/company, you should be suspicious and monitor the traffic between them using the 'mon <ip>' command. You can even check your security by scanning it with VirusTotal.)
-![Screenshot_3](https://github.com/user-attachments/assets/80638500-cdde-40e6-8230-967ddc6a4146)
+<img width="1427" height="942" alt="bytar1" src="https://github.com/user-attachments/assets/b63ae1a5-fd6b-4517-a7d6-597b2c5b7224" />
 
 - Monitoring connections
 ![Screenshot_4](https://github.com/user-attachments/assets/080cfb2d-8e6a-408e-bfb9-5d828ca918f2)
