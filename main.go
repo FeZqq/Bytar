@@ -312,10 +312,10 @@ func showEstablishedConnections() {
 	}
 
 	fmt.Println()
-	fmt.Printf("%s%-8s%s %s%-20s%s %s%-20s%s %s%-10s%s %s%-45s%s %s%-20s%s\n",
+	fmt.Printf("%s%-8s%s %s%-22s%s %s%-22s%s %s%-10s%s %s%-45s%s %s%-20s%s\n",
 		cyan, "Type", reset,
-		reset, "Local IP", reset,
-		cyan, "Remote IP", reset,
+		green, "Local IP:Port", reset,
+		yellow, "Remote IP:Port", reset,
 		red, "Country", reset,
 		blue, "Org", reset,
 		white, "Hostname", reset,
@@ -333,8 +333,10 @@ func showEstablishedConnections() {
 			continue
 		}
 
-		localIP := extractIP(fields[1])
-		remoteIP := extractIP(fields[2])
+		localAddr := fields[1]  // IP:Port
+		remoteAddr := fields[2] // IP:Port
+
+		remoteIP := extractIP(remoteAddr)
 		if remoteIP == "" {
 			continue
 		}
@@ -344,10 +346,10 @@ func showEstablishedConnections() {
 			info = &IPInfo{Org: "-", Hostname: "-", Country: "-"}
 		}
 
-		fmt.Printf("%s%-8s%s %s%-20s%s %s%-20s%s %s%-10s%s %s%-45s%s %s%-20s%s\n",
+		fmt.Printf("%s%-8s%s %s%-22s%s %s%-22s%s %s%-10s%s %s%-45s%s %s%-20s%s\n",
 			cyan, fields[0], reset,
-			reset, localIP, reset,
-			cyan, remoteIP, reset,
+			green, localAddr, reset,
+			yellow, remoteAddr, reset,
 			red, info.Country, reset,
 			blue, info.Org, reset,
 			white, info.Hostname, reset,
@@ -439,37 +441,6 @@ func PrintWifiPasswords() {
 		}
 
 		fmt.Printf("%-30s | %-30s\n", ssid, password)
-	}
-}
-
-func showConnections() {
-	var cmd *exec.Cmd
-
-	cmd = exec.Command("cmd", "/c", "netstat -ano")
-
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error running netstat:", err)
-		return
-	}
-
-	lines := strings.Split(string(output), "\n")
-	fmt.Println("\nActive Network Connections:\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(strings.ToLower(line), "proto") {
-			continue
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) >= 3 {
-			remote := fields[2]
-			fmt.Println("Remote Address:", remote)
-		}
 	}
 }
 
